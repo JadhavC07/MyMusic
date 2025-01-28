@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/modal/song.dart';
+import 'package:myapp/screen/playlist_details.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final List<Song> songs;
@@ -12,16 +13,17 @@ class PlaylistScreen extends StatefulWidget {
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
   final List<Map<String, dynamic>> _playlists = [];
+  final TextEditingController _playlistNameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _playlistNameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Playlists'),
-        actions: [
-          IconButton(icon: const Icon(Icons.add), onPressed: _createPlaylist),
-        ],
-      ),
       body:
           _playlists.isEmpty
               ? Center(
@@ -43,6 +45,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   );
                 },
               ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createPlaylist,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
@@ -53,16 +59,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           (context) => AlertDialog(
             title: const Text('New Playlist'),
             content: TextField(
+              controller: _playlistNameController,
               autofocus: true,
               decoration: const InputDecoration(hintText: 'Playlist name'),
-              onSubmitted: (value) {
-                if (value.isNotEmpty) {
-                  setState(() {
-                    _playlists.add({'name': value, 'songs': []});
-                  });
-                  Navigator.pop(context);
-                }
-              },
             ),
             actions: [
               TextButton(
@@ -71,8 +70,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Save playlist
-                  Navigator.pop(context);
+                  final name = _playlistNameController.text.trim();
+                  if (name.isNotEmpty) {
+                    setState(() {
+                      _playlists.add({'name': name, 'songs': <Song>[]});
+                    });
+                    _playlistNameController.clear();
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text('Create'),
               ),
@@ -82,6 +87,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   void _openPlaylist(Map<String, dynamic> playlist) {
-    // TODO: Navigate to playlist details screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => PlaylistDetailsScreen(
+              playlist: playlist,
+              allSongs: widget.songs,
+            ),
+      ),
+    );
   }
 }

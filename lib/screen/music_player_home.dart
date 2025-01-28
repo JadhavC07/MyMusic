@@ -2,6 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:myapp/modal/song.dart';
+import 'package:myapp/screen/now_playing.dart';
+import 'package:myapp/screen/playlist.dart';
+import 'package:myapp/screen/settings.dart';
+import 'package:myapp/widget/mini_player.dart';
+import 'package:myapp/widget/song_list.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 
@@ -222,64 +227,6 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
     );
   }
 
-  Widget _buildNowPlayingMiniPlayer() {
-    if (_currentSong == null) return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: () {
-        // TODO: Navigate to now playing screen
-      },
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.music_note, size: 40),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _currentSong!.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (_currentSong!.artist != null)
-                    Text(
-                      _currentSong!.artist!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[400],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-              onPressed: togglePlayPause,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   List<Song> _getFilteredSongs() {
     if (_searchQuery.isEmpty) return _songs;
@@ -289,6 +236,100 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
       return song.name.toLowerCase().contains(searchLower) ||
           (song.artist?.toLowerCase().contains(searchLower) ?? false);
     }).toList();
+  }
+
+  void _handleMenuItemSelected(Song song, String value) {
+    switch (value) {
+      case 'add_to_playlist':
+        // Show playlist selection dialog
+        break;
+      case 'share':
+        // Implement share functionality
+        break;
+    }
+  }
+
+  void _navigateToNowPlaying() {
+    if (_currentSong == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NowPlayingScreen(
+          currentSong: _currentSong!,
+          player: _player,
+          isPlaying: _isPlaying,
+          onPlayPause: togglePlayPause,
+          onNext: _playNextSong,
+          onPrevious: _playPreviousSong,
+        ),
+      ),
+    );
+  }
+
+  void _playNextSong() {
+    if (_currentSong == null) return;
+    final currentIndex = _songs.indexOf(_currentSong!);
+    if (currentIndex < _songs.length - 1) {
+      playSong(_songs[currentIndex + 1]);
+    }
+  }
+
+  void _playPreviousSong() {
+    if (_currentSong == null) return;
+    final currentIndex = _songs.indexOf(_currentSong!);
+    if (currentIndex > 0) {
+      playSong(_songs[currentIndex - 1]);
+    }
+  }
+
+  Widget _buildCurrentScreen() {
+    switch (_currentIndex) {
+      case 0:
+        return _buildLibraryScreen();
+      case 1:
+        return PlaylistScreen(songs: _songs);
+      case 2:
+        return const SettingsScreen();
+      default:
+        return _buildLibraryScreen();
+    }
+  }
+
+  Widget _buildLibraryScreen() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: _songs.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'No music files found.\nAdd some MP3 files to your device and tap the refresh button.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  ),
+                )
+              : SongsList(
+                  songs: _getFilteredSongs(),
+                  onSongTap: playSong,
+                  onMenuItemSelected: _handleMenuItemSelected,
+                ),
+        ),
+        if (_currentSong != null)
+          MiniPlayer(
+            currentSong: _currentSong!,
+            isPlaying: _isPlaying,
+            onPlayPause: togglePlayPause,
+            onTap: _navigateToNowPlaying,
+          ),
+      ],
+    );
   }
 
   @override
@@ -311,8 +352,12 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
                 },
                 autofocus: true,
               )
-            : const Text('Music Player'),
-        actions: [
+            : Text(_currentIndex == 0 
+                ? 'Music Player' 
+                : _currentIndex == 1 
+                    ? 'Playlists' 
+                    : 'Settings'),
+        actions: _currentIndex == 0 ? [
           IconButton(
             icon: Icon(_showSearchBar ? Icons.close : Icons.search),
             onPressed: () {
@@ -333,18 +378,9 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
             icon: const Icon(Icons.refresh),
             onPressed: () => scanMusic(),
           ),
-        ],
+        ] : null,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: _buildSongsList(),
-                ),
-                _buildNowPlayingMiniPlayer(),
-              ],
-            ),
+      body: _buildCurrentScreen(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -367,71 +403,6 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSongsList() {
-    final filteredSongs = _getFilteredSongs();
-    
-    if (filteredSongs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _songs.isEmpty
-                ? 'No music files found.\nAdd some MP3 files to your device and tap the refresh button.'
-                : 'No songs match your search.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[400]),
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: filteredSongs.length,
-      itemBuilder: (context, index) {
-        final song = filteredSongs[index];
-        return ListTile(
-          title: Text(
-            song.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: song.artist != null
-              ? Text(
-                  song.artist!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                )
-              : null,
-          leading: const Icon(Icons.music_note),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) {
-              // TODO: Implement menu actions
-              switch (value) {
-                case 'add_to_playlist':
-                  // Show playlist selection dialog
-                  break;
-                case 'share':
-                  // Implement share functionality
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'add_to_playlist',
-                child: Text('Add to Playlist'),
-              ),
-              const PopupMenuItem(
-                value: 'share',
-                child: Text('Share'),
-              ),
-            ],
-          ),
-          onTap: () => playSong(song),
-        );
-      },
     );
   }
 }
