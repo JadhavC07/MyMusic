@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:myapp/modal/song.dart';
+import 'package:myapp/screen/grouped_songs.dart';
 import 'package:myapp/screen/now_playing.dart';
 import 'package:myapp/screen/playlist.dart';
 import 'package:myapp/screen/settings.dart';
 import 'package:myapp/widget/mini_player.dart';
 import 'package:myapp/widget/song_list.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 
 class MusicPlayerHome extends StatefulWidget {
   const MusicPlayerHome({super.key});
@@ -75,25 +75,26 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Permission Required'),
-        content: const Text(
-          'Audio permission is required to access music files.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Permission Required'),
+            content: const Text(
+              'Audio permission is required to access music files.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -131,7 +132,15 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
         if (entity is File && entity.path.toLowerCase().endsWith('.mp3')) {
           final name = _getSongName(entity.path);
           songs.add(
-            Song(path: entity.path, name: name, artist: _extractArtist(name)),
+            Song(
+              path: entity.path,
+              name: name,
+              artist: _extractArtist(name),
+              album: null, // Placeholder, can extract if metadata is available
+              albumArtUrl:
+                  null, // Placeholder, can extract if metadata is available
+              duration: null, // Placeholder, can calculate using a library
+            ),
           );
         }
       }
@@ -201,36 +210,38 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
   void _showSortDialog() {
     showDialog(
       context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Sort by'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () {
-              setState(() {
-                _songs.sort((a, b) => a.name.compareTo(b.name));
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Title'),
+      builder:
+          (context) => SimpleDialog(
+            title: const Text('Sort by'),
+            children: [
+              SimpleDialogOption(
+                onPressed: () {
+                  setState(() {
+                    _songs.sort((a, b) => a.name.compareTo(b.name));
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Title'),
+              ),
+              SimpleDialogOption(
+                onPressed: () {
+                  setState(() {
+                    _songs.sort(
+                      (a, b) => (a.artist ?? '').compareTo(b.artist ?? ''),
+                    );
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Artist'),
+              ),
+            ],
           ),
-          SimpleDialogOption(
-            onPressed: () {
-              setState(() {
-                _songs.sort((a, b) => (a.artist ?? '').compareTo(b.artist ?? ''));
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Artist'),
-          ),
-        ],
-      ),
     );
   }
 
-
   List<Song> _getFilteredSongs() {
     if (_searchQuery.isEmpty) return _songs;
-    
+
     return _songs.where((song) {
       final searchLower = _searchQuery.toLowerCase();
       return song.name.toLowerCase().contains(searchLower) ||
@@ -255,14 +266,15 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => NowPlayingScreen(
-          currentSong: _currentSong!,
-          player: _player,
-          isPlaying: _isPlaying,
-          onPlayPause: togglePlayPause,
-          onNext: _playNextSong,
-          onPrevious: _playPreviousSong,
-        ),
+        builder:
+            (context) => NowPlayingScreen(
+              currentSong: _currentSong!,
+              player: _player,
+              isPlaying: _isPlaying,
+              onPlayPause: togglePlayPause,
+              onNext: _playNextSong,
+              onPrevious: _playPreviousSong,
+            ),
       ),
     );
   }
@@ -288,8 +300,10 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
       case 0:
         return _buildLibraryScreen();
       case 1:
-        return PlaylistScreen(songs: _songs);
+        return GroupSongsScreen(songs: _songs);
       case 2:
+        return PlaylistScreen(songs: _songs);
+      case 3:
         return const SettingsScreen();
       default:
         return _buildLibraryScreen();
@@ -304,22 +318,23 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
     return Column(
       children: [
         Expanded(
-          child: _songs.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'No music files found.\nAdd some MP3 files to your device and tap the refresh button.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[400]),
+          child:
+              _songs.isEmpty
+                  ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(
+                        'No music files found.\nAdd some MP3 files to your device and tap the refresh button.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey[400]),
+                      ),
                     ),
+                  )
+                  : SongsList(
+                    songs: _getFilteredSongs(),
+                    onSongTap: playSong,
+                    onMenuItemSelected: _handleMenuItemSelected,
                   ),
-                )
-              : SongsList(
-                  songs: _getFilteredSongs(),
-                  onSongTap: playSong,
-                  onMenuItemSelected: _handleMenuItemSelected,
-                ),
         ),
         if (_currentSong != null)
           MiniPlayer(
@@ -336,49 +351,57 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: _showSearchBar
-            ? TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search songs...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.white70),
+        title:
+            _showSearchBar
+                ? TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search songs...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: Colors.white70),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  autofocus: true,
+                )
+                : Text(
+                  _currentIndex == 0
+                      ? 'Music Player'
+                      : _currentIndex == 1
+                      ? 'Groups'
+                      : _currentIndex == 2
+                      ? 'Playlists'
+                      : 'Settings',
                 ),
-                style: const TextStyle(color: Colors.white),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-                autofocus: true,
-              )
-            : Text(_currentIndex == 0 
-                ? 'Music Player' 
-                : _currentIndex == 1 
-                    ? 'Playlists' 
-                    : 'Settings'),
-        actions: _currentIndex == 0 ? [
-          IconButton(
-            icon: Icon(_showSearchBar ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                _showSearchBar = !_showSearchBar;
-                if (!_showSearchBar) {
-                  _searchController.clear();
-                  _searchQuery = '';
-                }
-              });
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: _showSortDialog,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => scanMusic(),
-          ),
-        ] : null,
+        actions:
+            _currentIndex == 0
+                ? [
+                  IconButton(
+                    icon: Icon(_showSearchBar ? Icons.close : Icons.search),
+                    onPressed: () {
+                      setState(() {
+                        _showSearchBar = !_showSearchBar;
+                        if (!_showSearchBar) {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        }
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.sort),
+                    onPressed: _showSortDialog,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => scanMusic(),
+                  ),
+                ]
+                : null,
       ),
       body: _buildCurrentScreen(),
       bottomNavigationBar: BottomNavigationBar(
@@ -388,10 +411,12 @@ class _MusicPlayerHomeState extends State<MusicPlayerHome> {
             _currentIndex = index;
           });
         },
+        type: BottomNavigationBarType.fixed,
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Library'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Library',
+            icon: Icon(Icons.group_work),
+            label: 'Groups',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.playlist_play),

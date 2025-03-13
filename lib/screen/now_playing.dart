@@ -30,10 +30,29 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   bool _isShuffleEnabled = false;
   bool _isRepeatEnabled = false;
   bool _isFavorite = false;
+  late Song _currentSong;
+
+  @override
+  void didUpdateWidget(NowPlayingScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentSong != widget.currentSong) {
+      setState(() {
+        _currentSong = widget.currentSong;
+      });
+    }
+    if (oldWidget.isPlaying != widget.isPlaying) {
+      if (widget.isPlaying) {
+        _playPauseController.forward();
+      } else {
+        _playPauseController.reverse();
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _currentSong = widget.currentSong;
     _playPauseController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -154,7 +173,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     return Column(
       children: [
         Text(
-          widget.currentSong.name,
+          _currentSong.name,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 24,
@@ -163,9 +182,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
-        if (widget.currentSong.artist != null)
+        if (_currentSong.artist != null)
           Text(
-            widget.currentSong.artist!,
+            _currentSong.artist!,
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[400],
